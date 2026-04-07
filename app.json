@@ -1,15 +1,17 @@
 {
   "expo": {
-    "name": "expense-tracker-mobile",
+    "name": "Budget Tracker",
     "slug": "expense-tracker-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "expensetrackermobile",
+    "scheme": "budgettracker",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.josephpoya.budgettracker"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,14 +20,16 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "package": "com.josephpoya.budgettracker",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.josephpoya.expensetrackermobile"
+      "predictiveBackGestureEnabled": false
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
       [
@@ -39,16 +43,36 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      "expo-sqlite",
+      "@morrowdigital/watermelondb-expo-plugin",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "kotlinVersion": "2.0.21"
+          }
+        }
       ]
     ],
+
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     },
+
     "extra": {
-      "router": {},
       "eas": {
-        "projectId": "3f337c27-5897-4c4a-a43b-5569b10d3c9b"
+        "projectId": "7c1156d7-1793-4367-b1dc-123254c505f2"
+      }
+    },
+
+    "owner": "josephpoya",
+
+    "updates": {
+      "url": "https://u.expo.dev/7c1156d7-1793-4367-b1dc-123254c505f2",
+      "runtimeVersion": {
+        "policy": "nativeVersion"
       }
     }
   }
