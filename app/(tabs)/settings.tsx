@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, StatusBar, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../services/authStore';
-import { getCurrencies, getWallets, api } from '../../services/api';
 import { router } from 'expo-router';
 import { Modal, FlatList, TextInput, ActivityIndicator } from 'react-native';
 import { useTheme, ThemeCode } from '../../contexts/ThemeContext';

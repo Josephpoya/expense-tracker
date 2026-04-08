@@ -1,171 +1,150 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StatusBar, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { api, getCurrencies } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { database } from '../services/database';
+import ExchangeRate from '../services/database/models/ExchangeRate';
 
-// ✅ ADD THIS
-import AsyncStorage from '@react-native-async-storage/async-storage';
+const POPULAR_CURRENCIES = ['USD', 'EUR', 'GBP', 'UGX', 'KES', 'NGN', 'ZAR', 'JPY', 'INR', 'CAD', 'AUD'];
 
-const C = { bg:'#0f0c29',card:'rgba(255,255,255,0.06)',border:'rgba(255,255,255,0.10)',text:'#ffffff',muted:'rgba(255,255,255,0.55)',purple:'#6C63FF',teal:'#3ECFCF' };
-const POPULAR = ['USD','EUR','GBP','UGX','KES','NGN','ZAR','JPY','INR','CAD','AUD'];
+// Fallback rates (used only if database is empty)
+const DEFAULT_RATES: Record<string, number> = {
+  USD: 1, EUR: 0.92, GBP: 0.79, UGX: 3800, KES: 130,
+  NGN: 1500, ZAR: 18.5, JPY: 150, INR: 83, CAD: 1.37, AUD: 1.52
+};
 
-export default function CurrencyConverterScreen() {
-  const [currencies, setCurrencies] = useState<any[]>([]);
+export default function CurrencyConverter() {
+  const [amount, setAmount] = useState('');
   const [fromCurrency, setFromCurrency] = useState('USD');
   const [toCurrency, setToCurrency] = useState('UGX');
-  const [amount, setAmount] = useState('100');
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [selecting, setSelecting] = useState<'from'|'to'|null>(null);
-  const [search, setSearch] = useState('');
+  const [result, setResult] = useState<number | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>(DEFAULT_RATES);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(()=>{
-    getCurrencies()
-      .then(r=>{
-        const l=r.data.results||r.data;
-        setCurrencies(Array.isArray(l)?l:[]);
-      })
-      .catch(()=>{});
-  },[]);
-
-  // ✅ LOAD SAVED CURRENCIES
+  // Load rates from database
   useEffect(() => {
-    const loadSavedCurrencies = async () => {
-      try {
-        const from = await AsyncStorage.getItem('fromCurrency');
-        const to = await AsyncStorage.getItem('toCurrency');
-
-        if (from) setFromCurrency(from);
-        if (to) setToCurrency(to);
-      } catch (e) {
-        console.log('Error loading currencies');
-      }
-    };
-
-    loadSavedCurrencies();
+    loadRatesFromDatabase();
   }, []);
 
-  const convert = async()=>{
-    if(!amount||parseFloat(amount)<=0){
-      Alert.alert('Error','Enter a valid amount');
-      return;
-    }
-    setLoading(true);
-    try{
-      const res = await api.get('/currencies/rates/',{
-        params:{from:fromCurrency,to:toCurrency,amount}
-      });
-      setResult(res.data);
-    }catch(e:any){
-      const status=e?.response?.status;
-      Alert.alert(
-        'Error',
-        status===401
-          ?'Session expired. Please log out and log in again.'
-          :`Could not fetch rate`
-      );
-    }finally{
+  const loadRatesFromDatabase = async () => {
+    try {
+      const rates = await database.get<ExchangeRate>('exchange_rates').query().fetch();
+      
+      if (rates.length > 0) {
+        const ratesMap: Record<string, number> = { USD: 1 };
+        rates.forEach(rate => {
+          if (rate.fromCurrency === 'USD') {
+            ratesMap[rate.toCurrency] = rate.rate;
+          }
+        });
+        setExchangeRates(ratesMap);
+      } else {
+        // Seed default rates
+        await seedDefaultRates();
+      }
+    } catch (error) {
+      console.log('Error loading rates:', error);
+    } finally {
       setLoading(false);
     }
   };
 
-  const getCurrency = (code:string) => currencies.find(c=>c.code===code);
-  const filtered = currencies.filter(c =>
-    !search ||
-    c.code.toLowerCase().includes(search.toLowerCase()) ||
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const seedDefaultRates = async () => {
+    await database.write(async () => {
+      for (const [currency, rate] of Object.entries(DEFAULT_RATES)) {
+        if (currency !== 'USD') {
+          await database.get<ExchangeRate>('exchange_rates').create(record => {
+            record.fromCurrency = 'USD';
+            record.toCurrency = currency;
+            record.rate = rate;
+            record.lastUpdated = Date.now();
+          });
+        }
+      }
+    });
+    setExchangeRates(DEFAULT_RATES);
+  };
 
-  if(selecting) return (
-    <View style={{flex:1,backgroundColor:C.bg}}>
-      <StatusBar barStyle="light-content"/>
-      <SafeAreaView style={{flex:1}}>
-        <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:20,paddingVertical:12}}>
-          <TouchableOpacity onPress={()=>{setSelecting(null);setSearch('');}}>
-            <Text style={{color:C.purple,fontSize:15,fontWeight:'600'}}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={{color:C.text,fontSize:17,fontWeight:'700'}}>Select Currency</Text>
-          <View style={{width:60}}/>
-        </View>
+  const convert = () => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
 
-        <ScrollView>
-          {filtered.map(c=>(
-            <TouchableOpacity
-              key={c.code}
-              style={{padding:14}}
-              onPress={async ()=>{
-                if(selecting==='from'){
-                  setFromCurrency(c.code);
-                  await AsyncStorage.setItem('fromCurrency', c.code);
-                } else {
-                  setToCurrency(c.code);
-                  await AsyncStorage.setItem('toCurrency', c.code);
-                }
+    const fromRate = exchangeRates[fromCurrency] || 1;
+    const toRate = exchangeRates[toCurrency] || 1;
+    const converted = (numAmount / fromRate) * toRate;
+    setResult(converted);
+  };
 
-                setSelecting(null);
-                setSearch('');
-                setResult(null);
-              }}
-            >
-              <Text style={{color:C.text}}>{c.code} - {c.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </View>
-  );
+  const swapCurrencies = () => {
+    setFromCurrency(toCurrency);
+    setToCurrency(fromCurrency);
+    setResult(null);
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0f0c29', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#6C63FF" />
+      </View>
+    );
+  }
 
   return (
-    <View style={{flex:1,backgroundColor:C.bg}}>
-      <StatusBar barStyle="light-content"/>
-      <SafeAreaView style={{flex:1}}>
-        <ScrollView contentContainerStyle={{padding:16}}>
+    <ScrollView style={{ flex: 1, backgroundColor: '#0f0c29', padding: 20 }}>
+      <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 30, textAlign: 'center' }}>
+        Currency Converter
+      </Text>
+      
+      <Text style={{ color: '#ccc', marginBottom: 5 }}>Amount</Text>
+      <TextInput
+        style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', padding: 15, borderRadius: 12, fontSize: 18, marginBottom: 20 }}
+        placeholder="0.00"
+        placeholderTextColor="#666"
+        keyboardType="numeric"
+        value={amount}
+        onChangeText={setAmount}
+      />
 
-          <TouchableOpacity onPress={()=>setSelecting('from')}>
-            <Text style={{color:C.text}}>From: {fromCurrency}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#ccc', marginBottom: 5 }}>From</Text>
+          <TouchableOpacity style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 12 }}>
+            <Text style={{ color: '#fff', fontSize: 16 }}>{fromCurrency}</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={()=>setSelecting('to')}>
-            <Text style={{color:C.text}}>To: {toCurrency}</Text>
+        </View>
+        
+        <TouchableOpacity onPress={swapCurrencies} style={{ marginHorizontal: 15, marginTop: 20 }}>
+          <Text style={{ color: '#6C63FF', fontSize: 24 }}>⇄</Text>
+        </TouchableOpacity>
+        
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#ccc', marginBottom: 5 }}>To</Text>
+          <TouchableOpacity style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 12 }}>
+            <Text style={{ color: '#fff', fontSize: 16 }}>{toCurrency}</Text>
           </TouchableOpacity>
+        </View>
+      </View>
 
-          <TextInput
-            style={{color:C.text}}
-            value={amount}
-            onChangeText={v=>{
-              setAmount(v);
-              setResult(null);
-            }}
-          />
+      <TouchableOpacity
+        onPress={convert}
+        style={{ backgroundColor: '#6C63FF', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 20 }}
+      >
+        <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>Convert</Text>
+      </TouchableOpacity>
 
-          <TouchableOpacity onPress={convert}>
-            <Text style={{color:'#fff'}}>Convert</Text>
-          </TouchableOpacity>
-
-          {loading
-            ? <ActivityIndicator color={C.purple}/>
-            : <Text style={{color:C.teal}}>
-                {result ? result.converted : '—'}
-              </Text>
-          }
-
-          {/* ✅ POPULAR FIXED */}
-          {POPULAR.map(code=>(
-            <TouchableOpacity
-              key={code}
-              onPress={async ()=>{
-                setFromCurrency(code);
-                await AsyncStorage.setItem('fromCurrency', code);
-                setResult(null);
-              }}
-            >
-              <Text style={{color:C.text}}>{code}</Text>
-            </TouchableOpacity>
-          ))}
-
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+      {result !== null && (
+        <View style={{ backgroundColor: 'rgba(108,99,255,0.2)', padding: 20, borderRadius: 12, alignItems: 'center' }}>
+          <Text style={{ color: '#ccc', fontSize: 14 }}>Converted Amount</Text>
+          <Text style={{ color: '#6C63FF', fontSize: 32, fontWeight: 'bold', marginTop: 5 }}>
+            {result.toFixed(2)} {toCurrency}
+          </Text>
+        </View>
+      )}
+      
+      <Text style={{ color: '#666', fontSize: 12, textAlign: 'center', marginTop: 30 }}>
+        💡 Offline mode - Using saved exchange rates
+      </Text>
+    </ScrollView>
   );
 }

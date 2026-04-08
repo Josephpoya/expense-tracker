@@ -1,43 +1,53 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setAuthToken } from './api';
 
-interface AuthState {
-  user: any;
-  token: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  setAuth: (user: any, token: string) => Promise<void>;
-  logout: () => Promise<void>;
-  loadFromStorage: () => Promise<void>;
+interface UserProfile {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone_number?: string;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+interface LocalUserState {
+  user: UserProfile | null;
+  isLoading: boolean;
+  loadFromStorage: () => Promise<void>;
+  setUser: (user: UserProfile) => Promise<void>;
+  clearUser: () => Promise<void>;
+}
+
+const DEFAULT_USER: UserProfile = {
+  first_name: 'User',
+  last_name: '',
+  email: 'local@device.app',
+};
+
+export const useAuthStore = create<LocalUserState>((set) => ({
   user: null,
-  token: null,
-  isAuthenticated: false,
   isLoading: true,
-  setAuth: async (user, token) => {
-    await AsyncStorage.setItem('auth_token', token);
-    await AsyncStorage.setItem('auth_user', JSON.stringify(user));
-    setAuthToken(token);
-    set({ user, token, isAuthenticated: true });
-  },
-  logout: async () => {
-    await AsyncStorage.removeItem('auth_token');
-    await AsyncStorage.removeItem('auth_user');
-    setAuthToken(null);
-    set({ user: null, token: null, isAuthenticated: false });
-  },
+
   loadFromStorage: async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      const userStr = await AsyncStorage.getItem('auth_user');
-      if (token && userStr) {
-        setAuthToken(token);
-        set({ user: JSON.parse(userStr), token, isAuthenticated: true });
+      const str = await AsyncStorage.getItem('local_user');
+      if (str) {
+        set({ user: JSON.parse(str), isLoading: false });
+      } else {
+        // First launch: auto-create a default local user
+        await AsyncStorage.setItem('local_user', JSON.stringify(DEFAULT_USER));
+        set({ user: DEFAULT_USER, isLoading: false });
       }
-    } catch (e) {}
-    finally { set({ isLoading: false }); }
+    } catch {
+      set({ user: DEFAULT_USER, isLoading: false });
+    }
+  },
+
+  setUser: async (user) => {
+    await AsyncStorage.setItem('local_user', JSON.stringify(user));
+    set({ user });
+  },
+
+  clearUser: async () => {
+    await AsyncStorage.removeItem('local_user');
+    set({ user: null });
   },
 }));

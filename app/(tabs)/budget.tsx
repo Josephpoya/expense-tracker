@@ -4,7 +4,6 @@ import {
   RefreshControl, StatusBar, Modal, TextInput, Alert, Share
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getWallets, getTransactions, getCurrencies, getCategories, api } from '../../services/api';
 import { checkBudgetsAndNotify } from '../../services/notifications';
 
 const C = {

@@ -7,10 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "budgettracker",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.josephpoya.budgettracker"
+      "bundleIdentifier": "com.josephpoya.budgettracker",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -41,17 +44,7 @@
           }
         }
       ],
-      "expo-sqlite",
-      "@morrowdigital/watermelondb-expo-plugin",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true,
-            "kotlinVersion": "2.0.21"
-          }
-        }
-      ]
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

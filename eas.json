@@ -1,16 +1,12 @@
 {
   "cli": {
     "version": ">= 5.0.0",
-    "requireCommit": true,
-    "appVersionSource": "remote"
+    "requireCommit": false
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "simulator": true
-      }
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal",
@@ -21,13 +17,6 @@
     "production": {
       "autoIncrement": true,
       "channel": "production"
-    }
-  },
-  "submit": {
-    "production": {
-      "android": {
-        "track": "internal"
-      }
     }
   }
 }
